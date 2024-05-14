@@ -1,0 +1,78 @@
+{
+    "MeshGraph": {
+        "0":{
+            "10": {
+                "direct":5,
+                "indirect":1
+            },
+            "11": {
+                "direct":5,
+                "indirect":1
+            },
+            "12": {
+                "direct":5,
+                "indirect":1
+            },
+            "13": {
+                "direct":5,
+                "indirect":1
+            },
+            "14": {
+                "direct":5,
+                "indirect":0
+            },
+            "15": {
+                "direct":5,
+                "indirect":0
+            }
+        },
+        "12": {
+            "0" : {
+                "direct":17,
+                "indirect":1
+            },
+            "10": {
+                "direct":88,
+                "indirect":1
+            },
+            "13": {
+                "direct":94,
+                "indirect":1
+            }
+        },
+        "13" : {
+            "0": {
+                "direct":94,
+                "indirect":1
+            },
+            "11": {
+                "direct":93,
+                "indirect":1
+            },
+            "12": {
+                "direct":95,
+                "indirect":1
+            }
+        },
+        "14": {
+            "0": {
+                "direct":12,
+                "indirect":0
+            },
+            "11": {
+                "direct":0,
+                "indirect":30
+            }
+        }
+    
+    },
+    "DeviceNames": {
+        "0":"Base",
+        "10":"dev10",
+        "11":"dev11",
+        "12":"dev12",
+        "13":"dev13",
+        "14":"dev14",
+        "15":"dev15"
+    }
+}
