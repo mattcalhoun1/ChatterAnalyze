@@ -1,6 +1,7 @@
 import sys
 import time
 import json
+import serial
 
 import numpy as np
 
@@ -86,9 +87,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         
         return f"id:{device_id}"
 
-    def __load_graph (self):
+    def __load_graph (self, file_name):
         # load the file
-        if self.__load_graph_file() and self.__load_device_file():
+        if self.__load_graph_file(file_name) and self.__load_device_file(file_name):
             self.__MG = nx.MultiDiGraph()
             self.__edge_colors = []
             self.__line_widths = []
@@ -118,11 +119,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         else:
             return False
         
-    def __load_device_file (self):
+    def __load_device_file (self, file_name):
         # Opening JSON file
         found = False
         foundHeader = False
-        with(open('data/sample_raw_serial.json', 'r') as f):
+        with(open(file_name, 'r') as f):
             for nextLine in f:
                 print(nextLine)
                 if '= Begin Devices =' in nextLine:
@@ -145,11 +146,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             
         return found
 
-    def __load_graph_file (self):
+    def __load_graph_file (self, graph_file):
         # Opening JSON file
         found = False
         foundHeader = False
-        with(open('data/sample_raw_serial.json', 'r') as f):
+        with(open(graph_file, 'r') as f):
             for nextLine in f:
                 print(nextLine)
                 if '= Mesh Graph =' in nextLine:
@@ -163,11 +164,77 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             
         return found
 
-    def draw_graph (self):
-        if self.__load_graph():
+    def draw_graph (self, graph_file):
+        if self.__load_graph(graph_file):
             nx.draw_shell(self.__MG, with_labels=True, font_weight='bold', ax=self._static_ax, edge_color=self.__edge_colors, width=self.__line_widths)
         else:
             print("no graph available yet")
+
+
+    def stream_serial_to_file (self, usb_port, file_name, required_strings, timeout):
+        found_strings = False
+        start_time = time.time()
+
+        found = {}
+        for r in required_strings:
+            found[r] = False
+
+        self.__serial = serial.Serial(port=usb_port, baudrate=9600, timeout=timeout)
+        with open(file_name, 'wt') as out_file:
+            while time.time() - start_time < timeout and not found_strings:
+                if self.__has_serial_content():
+                    this_line = self.__get_serial_line(timeout=timeout)
+
+                    # reset the start_time since we're getting content
+                    start_time = time.time()
+
+                    print(this_line)
+
+                    out_file.write(this_line)
+                    out_file.write('\n')
+
+                    for r in required_strings:
+                        if r in this_line:
+                            found[r] = True
+                    
+                # check if all strings found
+                found_strings = True
+                for r in required_strings:
+                    if not found[r]:
+                        found_strings = False
+
+
+        return found_strings
+
+    def __has_serial_content (self):
+        hasmsg = self.__serial.in_waiting > 0
+        return hasmsg
+    
+    def __get_serial_line (self, timeout = 10.0):
+        # read bytes until we hit a carriage return or newline
+        complete_message = False
+        message_buffer = ""
+        start_time = time.time()
+        while complete_message == False and (time.time() - start_time <= timeout):
+            if self.__serial.in_waiting > 0:
+                next_byte = self.__serial.read()
+                try:
+                    next_str = next_byte.decode('utf-8')
+                    if next_str == '\n' or next_str == '\r':
+                        complete_message = True
+                    elif next_str == '\0' or next_str == '\x00':
+                        # ignore these characters, they may be c string terminators, but we dont care about those
+                        pass
+                    else:
+                        message_buffer += next_str
+                except Exception as e:
+                    print(f"Exception reading serial port: {e}")
+            else:
+                # wait for more bytes
+                time.sleep(0.05)
+
+        #logging.getLogger(__name__).info(f"Arduino: [{message_buffer}]")
+        return message_buffer.rstrip()
 
 if __name__ == "__main__":
     # Check whether there is already a running QApplication (e.g., if running
@@ -177,7 +244,33 @@ if __name__ == "__main__":
         qapp = QtWidgets.QApplication(sys.argv)
 
     app = ApplicationWindow()
-    app.draw_graph()
+
+    # wait for a serial connection
+    req_str = [
+        '= Begin Devices =',
+        '= End Devices =',
+        '= Mesh Graph =',
+        '= End Mesh Graph ='
+    ]
+
+    usb_ports = ['/dev/ttyACM0', '/dev/ttyUSB0']
+    streamed = False
+    while not streamed:
+        for p in usb_ports:
+            try:
+                streamed = app.stream_serial_to_file (p, '/tmp/chatter_device_log.txt', req_str, 20.0)
+                if streamed:
+                    break
+            except Exception as e:
+                print(f"scan failed: {e}")
+                time.sleep(5.0)                
+                print("scanning usb ports")
+
+    # begin ingesting serial data and writing to a temp file until we've received both required pieces
+
+
+
+    app.draw_graph('/tmp/chatter_device_log.txt')
     app.show()
     app.activateWindow()
     app.raise_()
