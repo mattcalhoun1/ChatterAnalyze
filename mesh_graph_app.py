@@ -85,7 +85,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             print(f'{int(device_id):03d} not found')
             print(f"Device {device_id} not found in device names")
         
-        return f"id:{device_id}"
+        return None #f"id:{device_id}"
 
     def __load_graph (self, file_name):
         # load the file
@@ -94,27 +94,31 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.__edge_colors = []
             self.__line_widths = []
 
+            link_threshold = 5
+
             # parse into a networkx multigraph
             for node in self.__graph_raw['MeshGraph']:
                 for neighbor in self.__graph_raw['MeshGraph'][node]:
                     if self.__get_device_name(neighbor) != self.__get_device_name(node):
                         # add direct connection (if any). otherwise show indirect (if any)
-                        if (self.__graph_raw['MeshGraph'][node][neighbor]['direct'] > 1):
-                            self.__MG.add_edge(
-                                self.__get_device_name(node),
-                                self.__get_device_name(neighbor),
-                                weight=self.__graph_raw['MeshGraph'][node][neighbor]['direct']
-                            )
-                            self.__edge_colors.append(self.__color_for_direct_rating(self.__graph_raw['MeshGraph'][node][neighbor]['direct']))
-                            self.__line_widths.append(1.0)
-                        elif (self.__graph_raw['MeshGraph'][node][neighbor]['indirect'] > 1):
-                            self.__MG.add_edge(
-                                self.__get_device_name(node),
-                                self.__get_device_name(neighbor),
-                                weight=self.__graph_raw['MeshGraph'][node][neighbor]['indirect']
-                            )
-                            self.__edge_colors.append(self.__color_for_indirect_rating(self.__graph_raw['MeshGraph'][node][neighbor]['indirect']))
-                            self.__line_widths.append(0.5)
+                        if (self.__graph_raw['MeshGraph'][node][neighbor]['direct'] > link_threshold):
+                            if self.__get_device_name(node) is not None and self.__get_device_name(neighbor) is not None:
+                                self.__MG.add_edge(
+                                    self.__get_device_name(node),
+                                    self.__get_device_name(neighbor),
+                                    weight=self.__graph_raw['MeshGraph'][node][neighbor]['direct']
+                                )
+                                self.__edge_colors.append(self.__color_for_direct_rating(self.__graph_raw['MeshGraph'][node][neighbor]['direct']))
+                                self.__line_widths.append(1.0)
+                        elif (self.__graph_raw['MeshGraph'][node][neighbor]['indirect'] > link_threshold):
+                            if self.__get_device_name(node) is not None and self.__get_device_name(neighbor) is not None:
+                                self.__MG.add_edge(
+                                    self.__get_device_name(node),
+                                    self.__get_device_name(neighbor),
+                                    weight=self.__graph_raw['MeshGraph'][node][neighbor]['indirect']
+                                )
+                                self.__edge_colors.append(self.__color_for_indirect_rating(self.__graph_raw['MeshGraph'][node][neighbor]['indirect']))
+                                self.__line_widths.append(0.5)
             return True
         else:
             return False
