@@ -76,6 +76,22 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         else:
             return 'cornsilk'
         
+    def __get_visible_device_name (self, device_id):
+        hidden_devices = [
+            'm.base',
+            'c.mobile2',
+            's.mobile',
+            's.base2',
+            's.base1'
+        ]
+        dev_name = self.__get_device_name(device_id=device_id)
+
+        if dev_name is not None:
+            if dev_name in hidden_devices:
+                return None
+
+        return dev_name
+        
     def __get_device_name (self, device_id):
         if device_id in self.__graph_raw['DeviceNames']:
             return self.__graph_raw['DeviceNames'][device_id]
@@ -99,22 +115,22 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             # parse into a networkx multigraph
             for node in self.__graph_raw['MeshGraph']:
                 for neighbor in self.__graph_raw['MeshGraph'][node]:
-                    if self.__get_device_name(neighbor) != self.__get_device_name(node):
+                    if self.__get_visible_device_name(neighbor) != self.__get_visible_device_name(node):
                         # add direct connection (if any). otherwise show indirect (if any)
                         if (self.__graph_raw['MeshGraph'][node][neighbor]['direct'] > link_threshold):
-                            if self.__get_device_name(node) is not None and self.__get_device_name(neighbor) is not None:
+                            if self.__get_visible_device_name(node) is not None and self.__get_visible_device_name(neighbor) is not None:
                                 self.__MG.add_edge(
-                                    self.__get_device_name(node),
-                                    self.__get_device_name(neighbor),
+                                    self.__get_visible_device_name(node),
+                                    self.__get_visible_device_name(neighbor),
                                     weight=self.__graph_raw['MeshGraph'][node][neighbor]['direct']
                                 )
                                 self.__edge_colors.append(self.__color_for_direct_rating(self.__graph_raw['MeshGraph'][node][neighbor]['direct']))
                                 self.__line_widths.append(1.0)
                         elif (self.__graph_raw['MeshGraph'][node][neighbor]['indirect'] > link_threshold):
-                            if self.__get_device_name(node) is not None and self.__get_device_name(neighbor) is not None:
+                            if self.__get_visible_device_name(node) is not None and self.__get_visible_device_name(neighbor) is not None:
                                 self.__MG.add_edge(
-                                    self.__get_device_name(node),
-                                    self.__get_device_name(neighbor),
+                                    self.__get_visible_device_name(node),
+                                    self.__get_visible_device_name(neighbor),
                                     weight=self.__graph_raw['MeshGraph'][node][neighbor]['indirect']
                                 )
                                 self.__edge_colors.append(self.__color_for_indirect_rating(self.__graph_raw['MeshGraph'][node][neighbor]['indirect']))
