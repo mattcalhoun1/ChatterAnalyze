@@ -1,5 +1,18 @@
 This is the ChatterBox Mesh Graph Visualization app.
 
+An example graph is also included to give you an idea of what you can see.
+
+At the time this graph was generated (from a device in my basement), I have 2 good
+"base" deployments, "base.2" and "south". I also have a device "school" which doesn't
+have a great antenna, but happens to be in a central location.
+
+As I would expect, looking at the graph, those 3 have several green connections with
+one another and various other devices. This means they have been discovered as 
+sort of "hubs" and will be used for most traffic, if meshing is involved. If one of them
+became powered off or went missing, it's connections show up as yellow and eventually go
+missing completely from the graph, and it would cease to be a hub device. If was powered back
+up, it would quickly regain its status as a "hub" just by the normal ping and mesh traffic.
+
 You can plug into the USB micro port of any ChatterBox (assuming it has mesh graph logging turned on)
 and get a visualization of what that ChatterBox's view of the mesh graph is. This can be useful for
 seeing how well the graph data is propagating, looking for good/bad connections, and things like that.
