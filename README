@@ -1,0 +1,40 @@
+This is the ChatterBox Mesh Graph Visualization app.
+
+You can plug into the USB micro port of any ChatterBox (assuming it has mesh graph logging turned on)
+and get a visualization of what that ChatterBox's view of the mesh graph is. This can be useful for
+seeing how well the graph data is propagating, looking for good/bad connections, and things like that.
+
+If a device has gone missing or been powered off for some time, it should eventually disappear from the graph.
+
+The direction arrows indicate which way the connection goes (it's usually both ways, but not necessarily).
+
+Green : Very strong/consistent connection
+Blue : Pretty good connection
+Yellow : Connected, but inconsistently
+
+requires:
+python 3
+
+pip packages:
+  pyserial
+  numpy
+  matplotlib
+  pyqt6
+  networkx
+
+On Linux (for me), the ChatterBox shows up on port: /dev/ttyACM0, /dev/ttyACM1, /dev/ttyUSB0, or /dev/ttyUSB1
+On Mac, the ChatterBox typically shows up on a port like: /dev/cu.usbmodem14101
+
+to run, connect a ChatterBox via USB and run:
+python mesh_graph_app.py
+
+If you know which USB port the ChatterBox is on, you can identify it like:
+python mesh_graph_app.py -p /dev/ttyACM0
+
+If you don't specify, the app will cycle through various ports looking until it finds (if it does).
+
+If you'd rather see indirect connections of the mesh graph, rather than direct, choose:
+python mesh_graph_app.py -d
+
+To exclude certain devices from the visualization, create a text file with the names of devices (one per line), use:
+python mesh_graph_app.py -e /home/matt/my_exclusions.text
