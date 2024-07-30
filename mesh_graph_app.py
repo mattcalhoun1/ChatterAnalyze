@@ -273,7 +273,7 @@ if __name__ == "__main__":
         '= End Mesh Graph ='
     ]
 
-    usb_ports = ['/dev/ttyACM0', '/dev/cu.usbmodem14101', '/dev/ttyUSB0']
+    usb_ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/cu.usbmodem14101', '/dev/ttyUSB0']
     streamed = False
     while not streamed:
         for p in usb_ports:
