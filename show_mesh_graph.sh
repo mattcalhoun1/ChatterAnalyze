@@ -1,0 +1,1 @@
+python mesh_graph_app.py -p /dev/ttyACM0 -e /home/matt/mesh_graph_maps/hidden_devices.txt

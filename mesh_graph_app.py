@@ -1,10 +1,7 @@
+import getopt
 import sys
-import time
 import json
-import serial
-
-import numpy as np
-
+from chatter_connector import ChatterConnector
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import \
     NavigationToolbar2QT as NavigationToolbar
@@ -30,27 +27,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
         self._static_ax = static_canvas.figure.subplots()
         self.__graph_raw = {}
-
-    def __load_graph_static (self):
-        adj_list = {'4': ['5', '6'], '6': ['4'], '5': ['4','6']}
-
-        self.__MG = nx.MultiDiGraph()
-        #G.add_nodes_from([(4, {"color": "red"}), (5, {"color": "green"})])
-        self.__MG.add_edge('4', '5', weight=4.7)
-        self.__MG.add_edge('5', '4', weight=8.7)
-
-        self.__MG.add_edge('4', '6', weight=1.7)
-        self.__MG.add_edge('6', '4', weight=6.7)
-
-        self.__MG.add_edge('5', '6', weight=12.0)
-
-        self.__edge_colors = [
-            'black',
-            'black',
-            'blue',
-            'blue',
-            'black'
-        ]
+        self.__hidden_devices = []
 
     def __color_for_direct_rating(self, rating):
         if (rating > 80):
@@ -77,17 +54,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             return 'cornsilk'
         
     def __get_visible_device_name (self, device_id):
-        hidden_devices = [
-            'm.base',
-            'c.mobile2',
-            's.mobile',
-            's.base2',
-            's.base1'
-        ]
         dev_name = self.__get_device_name(device_id=device_id)
 
         if dev_name is not None:
-            if dev_name in hidden_devices:
+            if dev_name in self.__hidden_devices:
                 return None
 
         return dev_name
@@ -103,21 +73,24 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         
         return None #f"id:{device_id}"
 
-    def __load_graph (self, file_name):
+    def __load_graph (self, file_name, show_direct_connections, show_indirect_connections, exclusions_file = None):
+        if exclusions_file is not None:
+            self.__load_exclusions_file(file_name=exclusions_file)
+
         # load the file
         if self.__load_graph_file(file_name) and self.__load_device_file(file_name):
             self.__MG = nx.MultiDiGraph()
             self.__edge_colors = []
             self.__line_widths = []
 
-            link_threshold = 5
+            link_threshold = 5 # a rating of at least 5 means devices have at some point been in range
 
             # parse into a networkx multigraph
             for node in self.__graph_raw['MeshGraph']:
                 for neighbor in self.__graph_raw['MeshGraph'][node]:
                     if self.__get_visible_device_name(neighbor) != self.__get_visible_device_name(node):
                         # add direct connection (if any). otherwise show indirect (if any)
-                        if (self.__graph_raw['MeshGraph'][node][neighbor]['direct'] > link_threshold):
+                        if (self.__graph_raw['MeshGraph'][node][neighbor]['direct'] > link_threshold and show_direct_connections):
                             if self.__get_visible_device_name(node) is not None and self.__get_visible_device_name(neighbor) is not None:
                                 self.__MG.add_edge(
                                     self.__get_visible_device_name(node),
@@ -126,7 +99,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                 )
                                 self.__edge_colors.append(self.__color_for_direct_rating(self.__graph_raw['MeshGraph'][node][neighbor]['direct']))
                                 self.__line_widths.append(1.0)
-                        elif (self.__graph_raw['MeshGraph'][node][neighbor]['indirect'] > link_threshold):
+                        elif (self.__graph_raw['MeshGraph'][node][neighbor]['indirect'] > link_threshold and show_indirect_connections):
                             if self.__get_visible_device_name(node) is not None and self.__get_visible_device_name(neighbor) is not None:
                                 self.__MG.add_edge(
                                     self.__get_visible_device_name(node),
@@ -138,7 +111,18 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             return True
         else:
             return False
-        
+
+    def __load_exclusions_file (self, file_name):
+        self.__hidden_devices = []
+        # Opening JSON file
+        with(open(file_name, 'r') as f):
+            for next_line in f:
+                #print(nextLine)
+                trimmed_line = next_line.rstrip().lstrip()
+                if len(trimmed_line) > 0:
+                    self.__hidden_devices.append(trimmed_line)
+        print(f"Excluding {len(self.__hidden_devices)} devices: {self.__hidden_devices}")
+            
     def __load_device_file (self, file_name):
         # Opening JSON file
         found = False
@@ -184,79 +168,24 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             
         return found
 
-    def draw_graph (self, graph_file):
-        if self.__load_graph(graph_file):
+    def draw_graph (self, graph_file, show_direct_connections = True, show_indirect_connections = False, exclusions_file=None):
+        if self.__load_graph(file_name=graph_file, show_direct_connections=show_direct_connections, show_indirect_connections=show_indirect_connections, exclusions_file=exclusions_file):
             nx.draw_shell(self.__MG, with_labels=True, font_weight='bold', ax=self._static_ax, edge_color=self.__edge_colors, width=self.__line_widths)
         else:
             print("no graph available yet")
 
-
-    def stream_serial_to_file (self, usb_port, file_name, required_strings, timeout):
-        found_strings = False
-        start_time = time.time()
-
-        found = {}
-        for r in required_strings:
-            found[r] = False
-
-        self.__serial = serial.Serial(port=usb_port, baudrate=9600, timeout=timeout)
-        with open(file_name, 'wt') as out_file:
-            while time.time() - start_time < timeout and not found_strings:
-                if self.__has_serial_content():
-                    this_line = self.__get_serial_line(timeout=timeout)
-
-                    # reset the start_time since we're getting content
-                    start_time = time.time()
-
-                    print(this_line)
-
-                    out_file.write(this_line)
-                    out_file.write('\n')
-
-                    for r in required_strings:
-                        if r in this_line:
-                            found[r] = True
-                    
-                # check if all strings found
-                found_strings = True
-                for r in required_strings:
-                    if not found[r]:
-                        found_strings = False
-
-
-        return found_strings
-
-    def __has_serial_content (self):
-        hasmsg = self.__serial.in_waiting > 0
-        return hasmsg
-    
-    def __get_serial_line (self, timeout = 10.0):
-        # read bytes until we hit a carriage return or newline
-        complete_message = False
-        message_buffer = ""
-        start_time = time.time()
-        while complete_message == False and (time.time() - start_time <= timeout):
-            if self.__serial.in_waiting > 0:
-                next_byte = self.__serial.read()
-                try:
-                    next_str = next_byte.decode('utf-8')
-                    if next_str == '\n' or next_str == '\r':
-                        complete_message = True
-                    elif next_str == '\0' or next_str == '\x00':
-                        # ignore these characters, they may be c string terminators, but we dont care about those
-                        pass
-                    else:
-                        message_buffer += next_str
-                except Exception as e:
-                    print(f"Exception reading serial port: {e}")
-            else:
-                # wait for more bytes
-                time.sleep(0.05)
-
-        #logging.getLogger(__name__).info(f"Arduino: [{message_buffer}]")
-        return message_buffer.rstrip()
+def show_help ():
+    print(f"Note: Your user will need permission to read the appropriate usb port. This visualization app has been tested on mac and linux only.")
+    print(f"~~~~~~~~~~~~~~~~~~~")
+    print(f"Usage: ")
+    print(f"  python mesh_graph_app.py -h (help)")
+    print(f"  python mesh_graph_app.py -d (show direct connections - choose direct or indirect, not both)")
+    print(f"  python mesh_graph_app.py -i (show indirect connections - choose direct or indirect, not both)")
+    print(f"  python mesh_graph_app.py -e <Exclusions File> (ex: /tmp/excluded_devices.txt)")
+    print(f"  python mesh_graph_app.py -p <USB Port> (ex: /dev/ttyACM0)")    
 
 if __name__ == "__main__":
+
     # Check whether there is already a running QApplication (e.g., if running
     # from an IDE).
     qapp = QtWidgets.QApplication.instance()
@@ -265,33 +194,42 @@ if __name__ == "__main__":
 
     app = ApplicationWindow()
 
-    # wait for a serial connection
-    req_str = [
-        '= Begin Devices =',
-        '= End Devices =',
-        '= Mesh Graph =',
-        '= End Mesh Graph ='
-    ]
+    argument_list = sys.argv[1:]
+    options = "hdie:p:"
+    long_options = ["Help", "Direct", "Indirect", "Exclusions=", "Port="]
 
-    usb_ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/cu.usbmodem14101', '/dev/ttyUSB0']
-    streamed = False
-    while not streamed:
-        for p in usb_ports:
-            try:
-                streamed = app.stream_serial_to_file (p, '/tmp/chatter_device_log.txt', req_str, 20.0)
-                if streamed:
-                    break
-            except Exception as e:
-                print(f"scan failed: {e}")
-                time.sleep(5.0)                
-                print("scanning usb ports")
+    # default ports list
+    default_usb_ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/cu.usbmodem14101', '/dev/ttyUSB0']
+    temp_graph_file = '/tmp/chatter_mesh_graph.txt'
+    show_direct = True
+    show_indirect = False
+    exclusions_file = None
 
-    # begin ingesting serial data and writing to a temp file until we've received both required pieces
+    arguments, values = getopt.getopt(argument_list, options, long_options)
+    for curr_arg, curr_val in arguments:
+        if curr_arg in ("-h", "--Help"):
+            show_help()
+            sys.exit(0)
+        elif curr_arg in ("-d", "--Direct"):
+            show_direct = True
+            show_indirect = False
+        elif curr_arg in ("-i", "--Indirect"):
+            show_indirect = True
+            show_direct = False
+        elif curr_arg in ("-e", "--Exclusions"):
+            exclusions_file = curr_val
+            print(f"Excluding: {exclusions_file}")
+        elif curr_arg in ("-p", "--Port"):
+            default_usb_ports = [curr_val,]
 
+    # connect to the ChatterBox (usb) and retrieve graph data.
+    # will take at least a few seconds, maybe up to a minute
+    chatter_conn = ChatterConnector(usb_port_list=default_usb_ports)
+    chatter_conn.pull_graph_data(output_file=temp_graph_file)
 
-
-    app.draw_graph('/tmp/chatter_device_log.txt')
+    app.draw_graph(graph_file=temp_graph_file, show_direct_connections=show_direct, show_indirect_connections=show_indirect, exclusions_file=exclusions_file)
     app.show()
     app.activateWindow()
     app.raise_()
     qapp.exec()
+
